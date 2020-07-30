@@ -4,7 +4,7 @@ Object.assign(A10.prototype, require('./node_modules/a10-nodejs-axapi/lib/a10_sy
 
 var opts = {
   DEBUG: 10,
-  IPAddr: "44.147.45.201",
+  IPAddr: "192.168.20.201",
   User: "admin",
   Passwd: "a10"
 }
