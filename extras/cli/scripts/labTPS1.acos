@@ -1,0 +1,25 @@
+!
+!  Basic setup of Thunder
+!
+ip dns primary 192.168.20.28
+!
+hostname labTPS-1
+!
+timezone America/Chicago
+!
+ntp server time.nist.gov
+  prefer
+!
+terminal idle-timeout 0
+!
+ip route 192.168.22.0 /24 192.168.20.28
+ip route 192.168.24.0 /24 192.168.20.28
+!
+interface ethernet 1
+  enable
+  ip address 10.1.11.22 255.255.255.0
+!
+interface ethernet 2
+  enable
+  ip address 10.1.22.22 255.255.255.0
+!

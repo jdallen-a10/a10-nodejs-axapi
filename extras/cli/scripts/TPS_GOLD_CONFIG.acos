@@ -1,0 +1,330 @@
+glid Strict_Rate_Limit
+  description "Apply to objects with expected low PPS"
+  pkt-rate-limit 1000
+!
+ddos zone-template logging CEF_Logger
+  log-format-cef
+  enable-action-logging
+!
+ddos action-list Drop
+  action drop
+!
+ddos action-list Auth_Pass
+  action authenticate-src
+!
+ddos action-list Blacklist
+  action blacklist-src 5
+!
+ddos zone-template ssl-l4 SSL_L4_Basic
+  renegotiation 4
+!
+ddos zone-template http HTTP_Basic
+  mss-timeout mss-percent 25 number-packets 5
+  mss-timeout action-list Blacklist
+  slow-read size 1024 count 5
+  slow-read action-list Blacklist
+  malformed-http check
+    action-list Drop
+!
+ddos zone-template http HTTP_Intermediate
+  mss-timeout mss-percent 25 number-packets 5
+  mss-timeout action-list Blacklist
+  challenge method http-redirect
+  challenge pass-action-list Auth_Pass
+  slow-read size 1024 count 5
+  slow-read action-list Blacklist
+  malformed-http check
+    action-list Drop
+!
+ddos zone-template http HTTP_Advanced
+  mss-timeout mss-percent 25 number-packets 5
+  mss-timeout action-list Blacklist
+  challenge method javascript
+  challenge pass-action-list Auth_Pass
+  challenge fail-action-list Blacklist
+  slow-read size 1024 count 5
+  slow-read action-list Blacklist
+  malformed-http check
+    action-list Drop
+!
+ddos zone-template dns DNS_UDP_Basic
+  any-check action-list Drop
+  malformed-query-check
+    basic-header-check
+    action-list Drop
+!
+ddos zone-template dns DNS_TCP_Basic
+  any-check action-list Drop
+  malformed-query-check
+    basic-header-check
+    action-list Drop
+!
+ddos zone-template dns DNS_UDP_Intermediate
+  any-check action-list Drop
+  dns-udp-authentication retry timeout 5
+  dns-udp-authentication retry min-delay 3
+  dst rate-limit request type A 50000
+  dst rate-limit request type AAAA 1000
+  dst rate-limit request type MX 1000
+  dst rate-limit request type NS 1000
+  dst rate-limit request action-list Drop
+  malformed-query-check
+    extended-header-check
+    action-list Drop
+!
+ddos zone-template dns DNS_TCP_Intermediate
+  any-check action-list Drop
+  dst rate-limit request type A 50000
+  dst rate-limit request type AAAA 1000
+  dst rate-limit request type MX 1000
+  dst rate-limit request type NS 1000
+  dst rate-limit request action-list Drop
+  malformed-query-check
+    extended-header-check
+    action-list Drop
+!
+ddos zone-template dns DNS_UDP_Advanced
+  any-check action-list Drop
+  dns-udp-authentication force-tcp
+  dns-udp-authentication pass-action-list Auth_Pass
+  dst rate-limit request type A 50000
+  dst rate-limit request type AAAA 1000
+  dst rate-limit request type MX 1000
+  dst rate-limit request type NS 1000
+  dst rate-limit request action-list Drop
+  malformed-query-check
+    extended-header-check
+    action-list Drop
+!
+ddos zone-template tcp TCP_Basic
+  zero-win 16 action-list Drop
+!
+ddos zone-template tcp TCP_Intermediate
+  zero-win 16 action-list Drop
+  syn-authentication send-rst
+  syn-authentication pass-action-list Auth_Pass
+  ack-authentication retransmit-check timeout 3
+  ack-authentication retransmit-check min-delay 1
+  ack-authentication pass-action-list Auth_Pass
+  ack-authentication fail-action-list Drop
+!
+#Drop all packets with source port below 1024
+ddos zone-template udp UDP_Basic
+  known-resp-src-port action-list Drop exclude-src-resp-port
+!
+ddos zone-template udp UDP_Intermediate
+  known-resp-src-port action-list Drop exclude-src-resp-port
+  spoof-detect timeout 5
+  spoof-detect pass-action-list Auth_Pass
+  spoof-detect fail-action-list Drop
+!
+ddos zone-template icmp-v4 ICMP_v4_Basic
+  type 0
+    src rate 10
+  type 3
+    action-list Drop
+  type 5
+    action-list Drop
+  type 8
+    action-list Drop
+  type 9
+    action-list Drop
+  type 10
+    action-list Drop
+  type 11
+    action-list Drop
+  type 14
+    action-list Drop
+!
+ddos violation-actions Blacklist_Source
+  blacklist-src 5
+!
+ddos dst zone Example_Zone
+  description "Example Zone Config"
+  operational-mode monitor
+  zone-template logging CEF_Logger
+  log enable periodic
+  src-port 19 udp
+    deny
+  src-port 53 udp
+    glid Strict_Rate_Limit
+  src-port 111 udp
+    deny
+  src-port 123 udp
+    glid Strict_Rate_Limit
+  src-port 137 udp
+    deny
+  src-port 161 udp
+    deny
+  src-port 1434 udp
+    deny
+  src-port 1900 udp
+    deny
+  src-port 389 udp
+    deny
+  ip-proto 2
+    deny
+  ip-proto tcp
+    drop-frag-pkt
+  ip-proto udp
+    drop-frag-pkt
+  ip-proto gre
+    deny
+  ip-proto icmp-v4
+    drop-frag-pkt
+    max-dynamic-entry-count 10000 apply-policy-on-overflow
+    enable-top-k
+    level 0
+      zone-escalation-score 10
+      src-escalation-score 10
+      indicator pkt-rate
+        score 20
+        src-threshold 100
+        zone-threshold 8000
+    level 1
+      zone-template icmp-v4 ICMP_v4_Basic
+      indicator pkt-rate
+        src-threshold 100
+        src-violation-actions Blacklist_Source
+    dynamic-entry-overflow-policy configuration
+      zone-template icmp-v4 ICMP_v4_Basic
+  ip-proto icmp-v6
+    deny
+  port 53 dns-tcp
+    enable-top-k
+    level 0
+      zone-escalation-score 10
+      src-escalation-score 10
+      indicator conn-miss-rate
+        score 20
+        zone-threshold 40000
+      indicator pkt-drop-ratio
+        zone-threshold 0.4
+      indicator syn-rate
+        src-threshold 1000
+        zone-threshold 20000
+    level 1
+      zone-template dns DNS_TCP_Intermediate
+      zone-template tcp TCP_Intermediate
+  port 53 dns-udp
+    enable-top-k
+    level 0
+      zone-escalation-score 10
+      src-escalation-score 10
+      indicator pkt-drop-ratio
+        score 20
+        zone-threshold 0.4
+      indicator pkt-rate
+        score 20
+        src-threshold 5000
+        zone-threshold 500000
+    level 1
+      src-escalation-score 10
+      zone-template dns DNS_UDP_Intermediate
+      indicator pkt-rate
+        score 20
+        src-threshold 5000
+    level 2
+      zone-template dns DNS_UDP_Advanced
+  port 80 http
+    enable-top-k
+    level 0
+      zone-escalation-score 10
+      src-escalation-score 10
+      zone-template http HTTP_Basic
+      indicator concurrent-conns
+        score 20
+        src-threshold 10000
+      indicator conn-miss-rate
+        score 20
+        zone-threshold 40000
+      indicator pkt-drop-ratio
+        score 20
+        zone-threshold 0.3
+      indicator syn-rate
+        score 20
+        src-threshold 1000
+        zone-threshold 20000
+    level 1
+      src-escalation-score 10
+      zone-template http HTTP_Basic
+      zone-template tcp TCP_Intermediate
+      indicator concurrent-conns
+        score 20
+        src-threshold 10000
+      indicator pkt-drop-ratio
+        score 20
+        src-threshold 0.7
+      indicator pkt-rate
+        score 20
+        src-threshold 5000
+    level 2
+      zone-template http HTTP_Intermediate
+      zone-template tcp TCP_Intermediate
+      indicator fin-rate
+        src-threshold 500
+        src-violation-actions Blacklist_Source
+      indicator pkt-rate
+        src-threshold 5000
+        src-violation-actions Blacklist_Source
+      indicator rst-rate
+        src-threshold 500
+        src-violation-actions Blacklist_Source
+      indicator syn-rate
+        src-threshold 500
+        src-violation-actions Blacklist_Source
+  port 443 ssl-l4
+    enable-top-k
+    level 0
+      zone-escalation-score 10
+      src-escalation-score 10
+      indicator concurrent-conns
+        score 20
+        src-threshold 10000
+      indicator conn-miss-rate
+        score 20
+        zone-threshold 40000
+      indicator syn-rate
+        score 20
+        src-threshold 1000
+        zone-threshold 20000
+    level 1
+      zone-template ssl-l4 SSL_L4_Basic
+      zone-template tcp TCP_Intermediate
+  port other tcp
+    enable-top-k
+    level 0
+      zone-escalation-score 10
+      src-escalation-score 10
+      indicator concurrent-conns
+        score 20
+        src-threshold 10000
+      indicator conn-miss-rate
+        score 20
+        zone-threshold 40000
+      indicator pkt-drop-ratio
+        score 20
+        zone-threshold 0.4
+      indicator syn-rate
+        score 20
+        src-threshold 1000
+        zone-threshold 20000
+    level 1
+      zone-template tcp TCP_Intermediate
+  port other udp
+    enable-top-k
+    level 0
+      zone-escalation-score 10
+      src-escalation-score 10
+      indicator pkt-drop-ratio
+        score 20
+        zone-threshold 0.4
+      indicator pkt-rate
+        score 20
+        src-threshold 5000
+        zone-threshold 20000
+    level 1
+      zone-template udp UDP_Intermediate
+      indicator pkt-rate
+        src-threshold 50000
+        src-violation-actions Blacklist_Source

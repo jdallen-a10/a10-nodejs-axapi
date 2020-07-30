@@ -1,0 +1,8 @@
+{
+  "nodes": [
+    {"name": "cThunder-Beta-69", "addr": "192.168.99.104", "user": "admin", "passwd": "a10"},
+    {"name": "labTPS-1", "addr": "192.168.20.92", "user": "admin", "passwd": "a10"},
+    {"name": "labADC-1", "addr": "192.168.20.201", "user": "admin", "passwd": "a10"},
+    {"name": "insideADC", "addr": "192.168.20.200", "user": "admin", "passwd": "a10"}
+  ]
+}

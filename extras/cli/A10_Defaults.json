@@ -1,0 +1,7 @@
+{
+  "IPAddr": "192.168.20.201",
+  "User": "admin",
+  "Passwd": "a10",
+  "DEBUG": 0,
+  "scriptDir": "./scripts"
+}

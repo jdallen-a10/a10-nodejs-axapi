@@ -1,0 +1,15 @@
+!
+!  Basic setup of Thunder
+!
+ip dns primary 192.168.20.28
+!
+timezone America/Chicago
+!
+ntp server time.nist.gov
+  prefer
+!
+terminal idle-timeout 0
+!
+ip route 192.168.22.0 /24 192.168.20.28
+ip route 192.168.24.0 /24 192.168.20.28
+!
